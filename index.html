@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بيانات الجهاز</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            padding: 20px; 
+            background-color: #f4f7f6; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center;
+            min-height: 90vh;
+            margin: 0;
+        }
+        .card { 
+            background: white; 
+            padding: 30px; 
+            border-radius: 16px; 
+            box-shadow: 0 8px 24px rgba(0,0,0,0.08); 
+            width: 100%; 
+            max-width: 550px; 
+        }
+        h2 { 
+            color: #0056b3; 
+            text-align: center; 
+            border-bottom: 2px solid #eef2f5; 
+            padding-bottom: 15px; 
+            margin-top: 0; 
+            font-size: 22px;
+        }
+        .data-row { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+            padding: 12px 8px; 
+            border-bottom: 1px solid #f1f5f9; 
+        }
+        .data-row:last-child {
+            border-bottom: none;
+        }
+        .data-row strong { 
+            color: #475569; 
+            font-size: 15px;
+        }
+        .data-row span { 
+            color: #0f172a; 
+            font-weight: 600; 
+            font-size: 15px;
+            text-align: left;
+            max-width: 60%;
+            word-break: break-word;
+        }
+        #result { 
+            margin-top: 15px; 
+        }
+        .error-msg {
+            color: #e11d48;
+            font-weight: bold;
+            text-align: center;
+            padding: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h2>تفاصيل جهاز الكمبيوتر</h2>
+        <div id="result" style="text-align: center; color: #64748b;">جاري تحميل البيانات...</div>
+    </div>
+
+    <script>
+        // ضع رابط الـ CSV المباشر من جوجل شيت بين العلامتين
+        const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTRSgHzJf3Hf9VryXLWbip92e9mfMkf1qv_ynff4sOR5-43REdRSOPq_VW5MZyT_9CaOKdZVoMwS39P/pub?output=csv';
+
+        async function fetchData() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const deviceId = urlParams.get('id');
+
+            if (!deviceId) {
+                document.getElementById('result').innerHTML = "<p class='error-msg'>لم يتم التعرف على كود الجهاز. تأكد من مسح الـ QR Code بشكل صحيح.</p>";
+                return;
+            }
+
+            try {
+                const response = await fetch(csvUrl);
+                const data = await response.text();
+                
+                // دالة لتقسيم السطور والتعامل مع الفواصل بالشكل الصحيح
+                const parseCSV = (str) => {
+                    return str.split('\n').map(row => {
+                        let matches = [];
+                        let match;
+                        let reg = /(?:\"([^\"]*)\"|([^,]+))/g;
+                        while ((match = reg.exec(row)) !== null) {
+                            matches.push(match[1] || match[2] || '');
+                        }
+                        return matches.length ? matches : row.split(',');
+                    });
+                };
+
+                const rows = parseCSV(data);
+                
+                // الصف الأول يحتوي على عناوين الأعمدة (Headers)
+                const headers = rows[0]; 
+                let found = false;
+
+                for (let i = 1; i < rows.length; i++) {
+                    const columns = rows[i];
+                    
+                    // المطابقة بكود الجهاز في العمود الأول
+                    if (columns[0] && columns[0].trim() === deviceId.trim()) {
+                        let htmlContent = '';
+                        
+                        // التكرار على جميع الأعمدة المتوفرة في الشيت تلقائياً
+                        for (let j = 0; j < headers.length; j++) {
+                            const headerName = headers[j] ? headers[j].trim() : '';
+                            const cellValue = columns[j] ? columns[j].trim() : '';
+                            
+                            // عرض الصف فقط لو العمود له اسم وله قيمة مسجلة
+                            if (headerName && cellValue) {
+                                htmlContent += `
+                                    <div class="data-row">
+                                        <strong>${headerName}:</strong> 
+                                        <span>${cellValue}</span>
+                                    </div>
+                                `;
+                            }
+                        }
+                        
+                        document.getElementById('result').innerHTML = htmlContent || "<p class='error-msg'>لا توجد بيانات مسجلة لهذا الجهاز.</p>";
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (!found) {
+                    document.getElementById('result').innerHTML = "<p class='error-msg'>هذا الجهاز غير مسجل في قاعدة البيانات.</p>";
+                }
+
+            } catch (error) {
+                document.getElementById('result').innerHTML = "<p class='error-msg'>حدث خطأ في قراءة البيانات، تأكد من أن رابط جوجل شيت يعمل بشكل صحيح.</p>";
+            }
+        }
+
+        fetchData();
+    </script>
+</body>
+</html>
